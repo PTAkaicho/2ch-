@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ja" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnonHub - Modern Anonymous BBS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .aa-text {
+            font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', 'IPAMonaPGothic', 'Mona', monospace;
+            font-size: 13px;
+            line-height: 1.15;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .anchor-link {
+            color: #2563eb;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .dark .anchor-link {
+            color: #60a5fa;
+        }
+
+        .quote-line {
+            color: #16a34a;
+        }
+        .dark .quote-line {
+            color: #4ade80;
+        }
+
+        /* Tooltip popup for anchor previews */
+        .popover-reply {
+            position: absolute;
+            z-index: 50;
+            max-width: 90vw;
+            width: 480px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+    <!-- Top Navigation -->
+    <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+        <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebarMobile()" class="md:hidden text-slate-500 hover:text-slate-700 dark:text-slate-400 p-1">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                <div onclick="showBoardList()" class="flex items-center gap-2 cursor-pointer group">
+                    <div class="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
+                        A
+                    </div>
+                    <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">AnonHub</span>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="hidden sm:flex items-center relative w-64 md:w-80">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 text-slate-400 text-xs"></i>
+                <input type="text" id="search-input" placeholder="スレッド・内容を検索..." oninput="filterThreads()"
+                       class="w-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-full pl-9 pr-4 py-2 border border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-slate-900 outline-none transition">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="openNewThreadModal()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3.5 py-2 rounded-full transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span class="hidden sm:inline">スレを立てる</span>
+                </button>
+                <button onclick="toggleTheme()" class="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Main Layout -->
+    <div class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 flex gap-6">
+
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-900 md:bg-transparent md:dark:bg-transparent border-r md:border-r-0 border-slate-200 dark:border-slate-800 p-4 md:p-0 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out shrink-0">
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-2">カテゴリ / 板一覧</h3>
+                    <nav id="board-menu-list" class="space-y-1">
+                        <!-- Dynamic Categories -->
+                    </nav>
+                </div>
+
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <h3 class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-2">掲示板ガイド</h3>
+                    <div class="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                        <div class="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300">
+                            <i class="fa-solid fa-shield-halved text-brand-500"></i>
+                            <span>完全匿名・登録不要</span>
+                        </div>
+                        <p class="leading-relaxed text-[11px]">
+                            ・メール欄に <code class="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">sage</code> 入力で順位維持。<br>
+                            ・<code class="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">>>レス番号</code> で返信アンカー。<br>
+                            ・名前欄に <code class="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">名前#秘密鍵</code> でトリップ生成。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sidebar Backdrop on Mobile -->
+        <div id="sidebar-backdrop" onclick="toggleSidebarMobile()" class="fixed inset-0 bg-black/40 z-20 hidden md:hidden"></div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 min-w-0">
+
+            <!-- Breadcrumb / Header -->
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
+                <div id="breadcrumb" class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                    <span onclick="showBoardList()" class="hover:text-brand-600 cursor-pointer">ホーム</span>
+                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    <span id="bc-board-name" class="font-semibold text-slate-800 dark:text-slate-200">全雑談</span>
+                </div>
+                <button onclick="reloadCurrentView()" class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                    <span>最新に更新</span>
+                </button>
+            </div>
+
+            <!-- VIEW 1: Thread List -->
+            <div id="view-thread-list" class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 id="board-title" class="text-xl font-bold text-slate-900 dark:text-white">全雑談</h1>
+                        <p id="board-desc" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">日常の自由な雑談と話題の共有</p>
+                    </div>
+                </div>
+
+                <!-- Threads Container -->
+                <div id="threads-container" class="space-y-3 pt-2">
+                    <!-- Dynamic thread cards -->
+                </div>
+
+                <div id="no-threads-msg" class="hidden text-center py-16 text-slate-400 dark:text-slate-500 text-sm">
+                    <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>
+                    条件に一致するスレッドは見つかりませんでした。
+                </div>
+            </div>
+
+            <!-- VIEW 2: Thread Detail -->
+            <div id="view-thread-detail" class="hidden space-y-4">
+                <button onclick="showBoardList()" class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-600 transition font-medium">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>スレッド一覧に戻る</span>
+                </button>
+
+                <!-- Active Thread Card Header -->
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-5 shadow-sm space-y-3">
+                    <div class="flex items-center gap-2">
+                        <span id="active-thread-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                            カテゴリ
+                        </span>
+                        <span id="active-thread-date" class="text-xs text-slate-400">日時</span>
+                    </div>
+                    <h1 id="active-thread-title" class="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight"></h1>
+                </div>
+
+                <!-- Posts List -->
+                <div id="posts-container" class="space-y-3">
+                    <!-- Dynamic posts -->
+                </div>
+
+                <!-- Reply Input Card -->
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm mt-6">
+                    <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2">
+                        <i class="fa-regular fa-comment-dots text-brand-500"></i>
+                        レスを返信する
+                    </h3>
+                    <form onsubmit="handleCreateReply(event)" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <input type="text" id="reply-name" placeholder="名前 (任意)" value="名無しさん"
+                                   class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                            <input type="text" id="reply-email" placeholder="E-mail (sage推奨)"
+                                   class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                        </div>
+                        <textarea id="reply-content" rows="4" required placeholder="レス内容を入力... (>>番号 で他のレスを引用)"
+                                  class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500 leading-relaxed"></textarea>
+                        <div class="flex items-center justify-between pt-1">
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-500 dark:text-slate-400">
+                                <input type="checkbox" id="reply-aa-mode" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span>AA (アスキーアート) モード</span>
+                            </label>
+                            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-5 py-2 rounded-xl transition shadow-sm">
+                                返信する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal: New Thread -->
+    <div id="new-thread-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="font-bold text-slate-900 dark:text-white text-base">新規スレッドの作成</h3>
+                <button onclick="closeNewThreadModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="handleCreateThread(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">投稿先カテゴリ</label>
+                    <select id="new-thread-board" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                        <!-- Options dynamically added -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">スレッドタイトル <span class="text-rose-500">*</span></label>
+                    <input type="text" id="new-thread-title" required placeholder="例: おすすめのWeb開発環境について語るスレ"
+                           class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">名前</label>
+                        <input type="text" id="new-thread-name" placeholder="名無しさん" value="名無しさん"
+                               class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">E-mail (sage可)</label>
+                        <input type="text" id="new-thread-email" placeholder="sage"
+                               class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 dark:text-slate-300 mb-1">本文 <span class="text-rose-500">*</span></label>
+                    <textarea id="new-thread-content" rows="5" required placeholder="スレッドの話題を入力..."
+                              class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-slate-800 dark:text-slate-200 outline-none focus:border-brand-500 leading-relaxed"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeNewThreadModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-sm">
+                        スレッドを作成
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Anchor Popover -->
+    <div id="popover-preview" class="popover-reply hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-xl"></div>
+
+    <script>
+        const BOARDS = [
+            { id: 'zatsudan', name: '全雑談', icon: 'fa-comments', desc: '日常の自由な雑談と話題の共有' },
+            { id: 'tech', name: 'テック・開発', icon: 'fa-code', desc: 'Web開発・AI・プログラミング全般' },
+            { id: 'gaming', name: 'ゲーム・エンタメ', icon: 'fa-gamepad', desc: '新作ゲーム、レトロゲー、アニメなど' },
+            { id: 'creative', name: '創作・アート', icon: 'fa-palette', desc: 'イラスト、デザイン、音楽制作' }
+        ];
+
+        const DEFAULT_THREADS = [
+            {
+                id: 'th-1',
+                boardId: 'zatsudan',
+                title: 'モダンなデザインの匿名掲示板アプリを作ってみた',
+                createdAt: '2026/04/10 14:20',
+                updatedAt: '2026/04/10 15:00',
+                likes: 12,
+                posts: [
+                    {
+                        num: 1,
+                        name: '開発者',
+                        trip: '◆AnonDev9',
+                        email: '',
+                        date: '2026/04/10 14:20',
+                        id: 'aB9xK10m',
+                        content: '2chの良さ（完全匿名・レス番号引用・sage機能）を残しつつ、現代的なUIにリメイクしてみました！\n>>2 アスキーアート表示や暗号化トリップ機能にも対応しています。',
+                        isAA: false
+                    },
+                    {
+                        num: 2,
+                        name: '名無しさん',
+                        trip: '',
+                        email: 'sage',
+                        date: '2026/04/10 14:22',
+                        id: 'Zq7P2x00',
+                        content: '>>1\nUIがめちゃくちゃ見やすい！ダークモード対応なのも最高です。',
+                        isAA: false
+                    },
+                    {
+                        num: 3,
+                        name: 'やる夫',
+                        trip: '',
+                        email: '',
+                        date: '2026/04/10 14:25',
+                        id: 'Yaruo123',
+                        content: ' 　 　 　　　＿＿＿_\n 　 　　　／　　 　 　＼\n 　 　 ／　　─　 　 ─＼　　　AAもバッチリ表示されるお！\n 　 ／ 	　 （●） {●） ＼\n 　 |　 　 　 （__人__）　 　 |\n 　  ＼　 　 	`ー\'\'　 　 ／',
+                        isAA: true
+                    }
+                ]
+            },
+            {
+                id: 'th-2',
+                boardId: 'tech',
+                title: 'Tailwind CSS v4の使い心地ってどう？',
+                createdAt: '2026/04/10 11:00',
+                updatedAt: '2026/04/10 13:40',
+                likes: 8,
+                posts: [
+                    {
+                        num: 1,
+                        name: '名無しさん',
+                        trip: '',
+                        email: '',
+                        date: '2026/04/10 11:00',
+                        id: 'Dev901aa',
+                        content: '設定ファイルの簡略化や処理速度の向上が目立ちますが、実際に使っている方の感想を聞きたいです。',
+                        isAA: false
+                    }
+                ]
+            }
+        ];
+
+        let currentBoardId = 'zatsudan';
+        let currentThreadId = null;
+        let threads = [];
+
+        window.onload = function() {
+            loadTheme();
+            loadStorageData();
+            renderBoardMenu();
+            showBoardList();
+        };
+
+        function loadStorageData() {
+            const saved = localStorage.getItem('anonhub_threads');
+            if (saved) {
+                try { threads = JSON.parse(saved); } catch (e) { threads = DEFAULT_THREADS; }
+            } else {
+                threads = DEFAULT_THREADS;
+                saveStorageData();
+            }
+        }
+
+        function saveStorageData() {
+            localStorage.setItem('anonhub_threads', JSON.stringify(threads));
+        }
+
+        // Theme Handling
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('anonhub_theme', isDark ? 'dark' : 'light');
+            updateThemeIcon(isDark);
+        }
+
+        function loadTheme() {
+            const saved = localStorage.getItem('anonhub_theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = saved === 'dark' || (!saved && prefersDark);
+            if (isDark) document.documentElement.classList.add('dark');
+            updateThemeIcon(isDark);
+        }
+
+        function updateThemeIcon(isDark) {
+            const icon = document.getElementById('theme-icon');
+            icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        }
+
+        // Sidebar
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        // Render Navigation
+        function renderBoardMenu() {
+            const menuEl = document.getElementById('board-menu-list');
+            const selectEl = document.getElementById('new-thread-board');
+            menuEl.innerHTML = '';
+            selectEl.innerHTML = '';
+
+            BOARDS.forEach(board => {
+                const isSelected = board.id === currentBoardId;
+                const a = document.createElement('a');
+                a.className = `flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                    isSelected 
+                        ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 font-semibold' 
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`;
+                a.onclick = () => {
+                    switchBoard(board.id);
+                    if (window.innerWidth < 768) toggleSidebarMobile();
+                };
+                a.innerHTML = `<i class="fa-solid ${board.icon} text-sm"></i> <span>${board.name}</span>`;
+                menuEl.appendChild(a);
+
+                const opt = document.createElement('option');
+                opt.value = board.id;
+                opt.textContent = board.name;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        function switchBoard(boardId) {
+            currentBoardId = boardId;
+            const b = BOARDS.find(x => x.id === boardId);
+            document.getElementById('bc-board-name').textContent = b ? b.name : '';
+            document.getElementById('board-title').textContent = b ? b.name : '';
+            document.getElementById('board-desc').textContent = b ? b.desc : '';
+            renderBoardMenu();
+            showBoardList();
+        }
+
+        function showBoardList() {
+            currentThreadId = null;
+            document.getElementById('view-thread-list').classList.remove('hidden');
+            document.getElementById('view-thread-detail').classList.add('hidden');
+            document.getElementById('breadcrumb').innerHTML = `
+                <span onclick="showBoardList()" class="hover:text-brand-600 cursor-pointer">ホーム</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span class="font-semibold text-slate-800 dark:text-slate-200">${getBoardName(currentBoardId)}</span>
+            `;
+            renderThreadCards();
+        }
+
+        function renderThreadCards() {
+            const container = document.getElementById('threads-container');
+            const noMsg = document.getElementById('no-threads-msg');
+            const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+
+            const filtered = threads
+                .filter(t => t.boardId === currentBoardId)
+                .filter(t => t.title.toLowerCase().includes(searchVal) || t.posts[0].content.toLowerCase().includes(searchVal))
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+            container.innerHTML = '';
+
+            if (filtered.length === 0) {
+                noMsg.classList.remove('hidden');
+                return;
+            } else {
+                noMsg.classList.add('hidden');
+            }
+
+            filtered.forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition cursor-pointer group';
+                card.onclick = () => openThreadDetail(t.id);
+
+                const firstPost = t.posts[0];
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="space-y-1 flex-1">
+                            <h2 class="text-base font-bold text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition leading-snug">
+                                ${escapeHtml(t.title)}
+                            </h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                ${escapeHtml(firstPost.content)}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
+                        <div class="flex items-center gap-3">
+                            <span class="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300">
+                                <i class="fa-regular fa-comment text-slate-400"></i> ${t.posts.length}
+                            </span>
+                            <button onclick="likeThread(event, '${t.id}')" class="flex items-center gap-1 hover:text-rose-500 transition">
+                                <i class="fa-regular fa-heart text-slate-400 hover:text-rose-500"></i> ${t.likes || 0}
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px]">
+                            <span>${t.updatedAt} 更新</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function likeThread(e, threadId) {
+            e.stopPropagation();
+            const t = threads.find(x => x.id === threadId);
+            if (t) {
+                t.likes = (t.likes || 0) + 1;
+                saveStorageData();
+                renderThreadCards();
+            }
+        }
+
+        function openThreadDetail(threadId) {
+            currentThreadId = threadId;
+            const thread = threads.find(t => t.id === threadId);
+            if (!thread) return;
+
+            document.getElementById('view-thread-list').classList.add('hidden');
+            document.getElementById('view-thread-detail').classList.remove('hidden');
+
+            document.getElementById('active-thread-title').textContent = thread.title;
+            document.getElementById('active-thread-badge').textContent = getBoardName(thread.boardId);
+            document.getElementById('active-thread-date').textContent = thread.createdAt;
+
+            document.getElementById('breadcrumb').innerHTML = `
+                <span onclick="showBoardList()" class="hover:text-brand-600 cursor-pointer">ホーム</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span onclick="showBoardList()" class="hover:text-brand-600 cursor-pointer">${getBoardName(thread.boardId)}</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span class="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px] inline-block align-bottom">${escapeHtml(thread.title)}</span>
+            `;
+
+            renderPosts(thread.posts);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderPosts(posts) {
+            const container = document.getElementById('posts-container');
+            container.innerHTML = '';
+
+            posts.forEach(post => {
+                const postEl = document.createElement('div');
+                postEl.id = `post-${post.num}`;
+                postEl.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 shadow-sm transition space-y-2 text-xs';
+
+                const formattedContent = formatPostContent(post.content);
+
+                postEl.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/50 pb-2 text-slate-400">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-700 dark:text-slate-200 cursor-pointer hover:text-brand-600" onclick="appendAnchorToReply(${post.num})">
+                                #${post.num}
+                            </span>
+                            <span class="font-semibold text-brand-600 dark:text-brand-400">${escapeHtml(post.name)}</span>
+                            ${post.trip ? `<span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono px-1.5 py-0.5 rounded text-[10px]">${escapeHtml(post.trip)}</span>` : ''}
+                            ${post.email ? `<span class="text-blue-500">[${escapeHtml(post.email)}]</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 text-[11px]">
+                            <span>${post.date}</span>
+                            <span class="bg-slate-100 dark:bg-slate-700/60 px-1.5 py-0.5 rounded text-[10px]">ID:${post.id}</span>
+                        </div>
+                    </div>
+                    <div class="${post.isAA ? 'aa-text text-slate-800 dark:text-slate-200' : 'text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed'}">
+                        ${formattedContent}
+                    </div>
+                `;
+                container.appendChild(postEl);
+            });
+
+            attachAnchorPreviewListeners();
+        }
+
+        function formatPostContent(text) {
+            let escaped = escapeHtml(text);
+            const lines = escaped.split('\n').map(line => {
+                if (line.trim().startsWith('&gt;')) {
+                    return `<span class="quote-line">${line}</span>`;
+                }
+                return line;
+            });
+            escaped = lines.join('\n');
+
+            const anchorRegex = /&gt;&gt;(\d+)/g;
+            return escaped.replace(anchorRegex, (match, num) => {
+                return `<a class="anchor-link" data-target="${num}" onclick="scrollToPost(${num})">&gt;&gt;${num}</a>`;
+            });
+        }
+
+        function appendAnchorToReply(postNum) {
+            const textarea = document.getElementById('reply-content');
+            textarea.value += `>>${postNum}\n`;
+            textarea.focus();
+        }
+
+        function scrollToPost(postNum) {
+            const targetEl = document.getElementById(`post-${postNum}`);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetEl.classList.add('ring-2', 'ring-brand-500');
+                setTimeout(() => targetEl.classList.remove('ring-2', 'ring-brand-500'), 1500);
+            }
+        }
+
+        function attachAnchorPreviewListeners() {
+            const popover = document.getElementById('popover-preview');
+            const links = document.querySelectorAll('.anchor-link');
+
+            links.forEach(link => {
+                link.addEventListener('mouseenter', (e) => {
+                    const targetNum = link.getAttribute('data-target');
+                    const thread = threads.find(t => t.id === currentThreadId);
+                    if (!thread) return;
+
+                    const targetPost = thread.posts.find(p => p.num == targetNum);
+                    if (targetPost) {
+                        popover.innerHTML = `
+                            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700 pb-1 mb-1.5 flex justify-between">
+                                <span>>>${targetPost.num} ${escapeHtml(targetPost.name)}</span>
+                                <span>ID:${targetPost.id}</span>
+                            </div>
+                            <div class="${targetPost.isAA ? 'aa-text' : 'whitespace-pre-wrap text-xs text-slate-800 dark:text-slate-200'}">
+                                ${escapeHtml(targetPost.content)}
+                            </div>
+                        `;
+                        popover.classList.remove('hidden');
+
+                        const rect = link.getBoundingClientRect();
+                        popover.style.top = `${window.scrollY + rect.bottom + 6}px`;
+                        popover.style.left = `${Math.min(window.scrollX + rect.left, window.innerWidth - 320)}px`;
+                    }
+                });
+
+                link.addEventListener('mouseleave', () => {
+                    popover.classList.add('hidden');
+                });
+            });
+        }
+
+        function handleCreateThread(e) {
+            e.preventDefault();
+
+            const boardId = document.getElementById('new-thread-board').value;
+            const title = document.getElementById('new-thread-title').value.trim();
+            const rawName = document.getElementById('new-thread-name').value.trim() || '名無しさん';
+            const email = document.getElementById('new-thread-email').value.trim();
+            const content = document.getElementById('new-thread-content').value.trim();
+
+            if (!title || !content) return;
+
+            const { name, trip } = parseTripcode(rawName);
+            const dateStr = formatDate(new Date());
+            const generatedId = generateRandomID();
+
+            const newThread = {
+                id: 'th-' + Date.now(),
+                boardId: boardId,
+                title: title,
+                createdAt: dateStr,
+                updatedAt: dateStr,
+                likes: 0,
+                posts: [
+                    {
+                        num: 1,
+                        name: name,
+                        trip: trip,
+                        email: email,
+                        date: dateStr,
+                        id: generatedId,
+                        content: content,
+                        isAA: false
+                    }
+                ]
+            };
+
+            threads.unshift(newThread);
+            saveStorageData();
+
+            closeNewThreadModal();
+            document.getElementById('new-thread-title').value = '';
+            document.getElementById('new-thread-content').value = '';
+
+            switchBoard(boardId);
+            openThreadDetail(newThread.id);
+        }
+
+        function handleCreateReply(e) {
+            e.preventDefault();
+            if (!currentThreadId) return;
+
+            const thread = threads.find(t => t.id === currentThreadId);
+            if (!thread) return;
+
+            const rawName = document.getElementById('reply-name').value.trim() || '名無しさん';
+            const email = document.getElementById('reply-email').value.trim();
+            const content = document.getElementById('reply-content').value.trim();
+            const isAA = document.getElementById('reply-aa-mode').checked;
+
+            if (!content) return;
+
+            const { name, trip } = parseTripcode(rawName);
+            const dateStr = formatDate(new Date());
+            const generatedId = generateRandomID();
+            const nextNum = thread.posts.length + 1;
+
+            const newPost = {
+                num: nextNum,
+                name: name,
+                trip: trip,
+                email: email,
+                date: dateStr,
+                id: generatedId,
+                content: content,
+                isAA: isAA
+            };
+
+            thread.posts.push(newPost);
+
+            if (email.toLowerCase() !== 'sage') {
+                thread.updatedAt = dateStr;
+            }
+
+            saveStorageData();
+
+            document.getElementById('reply-content').value = '';
+            openThreadDetail(thread.id);
+
+            setTimeout(() => {
+                const lastPost = document.getElementById(`post-${nextNum}`);
+                if (lastPost) lastPost.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+
+        function parseTripcode(inputName) {
+            const hashIndex = inputName.indexOf('#');
+            if (hashIndex === -1) return { name: inputName, trip: '' };
+
+            const name = inputName.substring(0, hashIndex) || '名無しさん';
+            const key = inputName.substring(hashIndex + 1);
+
+            let hash = 0;
+            for (let i = 0; i < key.length; i++) {
+                hash = ((hash << 5) - hash) + key.charCodeAt(i);
+                hash |= 0;
+            }
+            return { name: name, trip: '◆' + Math.abs(hash).toString(36).substring(0, 8) };
+        }
+
+        function generateRandomID() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let res = '';
+            for (let i = 0; i < 8; i++) {
+                res += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return res;
+        }
+
+        function formatDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+        }
+
+        function escapeHtml(str) {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function getBoardName(boardId) {
+            const b = BOARDS.find(x => x.id === boardId);
+            return b ? b.name : 'カテゴリ';
+        }
+
+        function filterThreads() {
+            if (!currentThreadId) renderThreadCards();
+        }
+
+        function reloadCurrentView() {
+            loadStorageData();
+            if (currentThreadId) openThreadDetail(currentThreadId);
+            else renderThreadCards();
+        }
+
+        function openNewThreadModal() {
+            document.getElementById('new-thread-modal').classList.remove('hidden');
+        }
+
+        function closeNewThreadModal() {
+            document.getElementById('new-thread-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
